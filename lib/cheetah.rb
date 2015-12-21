@@ -220,8 +220,14 @@ module Cheetah
     chroot: "/"
   }
 
-  READ  = 0 # @private
-  WRITE = 1 # @private
+  # A slightly more readable and testable representation
+  # of the pair of streams that IO.pipe returns
+  class Pipe
+    attr_reader :readme, :writeme
+    def initialize
+      @readme, @writeme = * IO.pipe
+    end
+  end
 
   class << self
     # The default options of the {Cheetah.run} method. Values of options not
@@ -473,22 +479,22 @@ module Cheetah
 
     # Reopen *stream* to write **into** the writing half of *pipe*
     # and close the reading half of *pipe*.
-    # @param pipe [Array<IO>] a pair of IOs as returned from IO.pipe
+    # @param pipe [Pipe]
     # @param stream [IO]
     def self.into_pipe(stream, pipe)
-      stream.reopen(pipe[WRITE])
-      pipe[WRITE].close
-      pipe[READ].close
+      stream.reopen(pipe.writeme)
+      pipe.writeme.close
+      pipe.readme.close
     end
 
     # Reopen *stream* to read **from** the reading half of *pipe*
     # and close the writing half of *pipe*.
-    # @param pipe [Array<IO>] a pair of IOs as returned from IO.pipe
+    # @param pipe [Pipe]
     # @param stream [IO]
     def self.from_pipe(stream, pipe)
-      stream.reopen(pipe[READ])
-      pipe[READ].close
-      pipe[WRITE].close
+      stream.reopen(pipe.readme)
+      pipe.readme.close
+      pipe.writeme.close
     end
 
     def self.chroot_step(options)
@@ -513,7 +519,7 @@ module Cheetah
           if commands.size == 1
             from_pipe(STDIN, pipes[:stdin])
           else
-            pipe_to_child = IO.pipe
+            pipe_to_child = Pipe.new
 
             fork_commands_recursive(commands[0..-2],
                                     {
@@ -524,8 +530,8 @@ module Cheetah
                                     options
                                    )
 
-            pipes[:stdin][READ].close
-            pipes[:stdin][WRITE].close
+            pipes[:stdin].readme.close
+            pipes[:stdin].writeme.close
 
             from_pipe(STDIN, pipe_to_child)
           end
@@ -543,7 +549,7 @@ module Cheetah
           end
         rescue SystemCallError => e
           # depends when failed, if pipe is already redirected or not, so lets find it
-          output = pipes[:stderr][WRITE].closed? ? STDERR : pipes[:stderr][WRITE]
+          output = pipes[:stderr].writeme.closed? ? STDERR : pipes[:stderr].writeme
           output.puts e.message
 
           exit!(127)
@@ -552,14 +558,14 @@ module Cheetah
     end
 
     def self.fork_commands(commands, options)
-      pipes = { stdin: IO.pipe, stdout: IO.pipe, stderr: IO.pipe }
+      pipes = { stdin: Pipe.new, stdout: Pipe.new, stderr: Pipe.new }
 
       pid = fork_commands_recursive(commands, pipes, options)
 
       [
-        pipes[:stdin][READ],
-        pipes[:stdout][WRITE],
-        pipes[:stderr][WRITE]
+        pipes[:stdin].readme,
+        pipes[:stdout].writeme,
+        pipes[:stderr].writeme
       ].each(&:close)
 
       [pid, pipes]
@@ -578,15 +584,15 @@ module Cheetah
       # Similar issues can happen with standard input vs. one of the outputs.
       stdin_buffer = ""
       outputs = {
-        pipes[:stdout][READ] => streams[:stdout],
-        pipes[:stderr][READ] => streams[:stderr]
+        pipes[:stdout].readme => streams[:stdout],
+        pipes[:stderr].readme => streams[:stderr]
       }
       recorder_methods = {
-        pipes[:stdout][READ] => :record_stdout,
-        pipes[:stderr][READ] => :record_stderr
+        pipes[:stdout].readme => :record_stdout,
+        pipes[:stderr].readme => :record_stderr
       }
-      pipes_readable = [pipes[:stdout][READ], pipes[:stderr][READ]]
-      pipes_writable = [pipes[:stdin][WRITE]]
+      pipes_readable = [pipes[:stdout].readme, pipes[:stderr].readme]
+      pipes_writable = [pipes[:stdin].writeme]
       loop do
         pipes_readable.reject!(&:closed?)
         pipes_writable.reject!(&:closed?)
