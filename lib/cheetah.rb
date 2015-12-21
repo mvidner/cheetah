@@ -240,6 +240,7 @@ module Cheetah
     #
     # @return [Hash] the default options of the {Cheetah.run} method
     attr_accessor :default_options
+  end
 
     # Runs external command(s) with specified arguments.
     #
@@ -380,7 +381,7 @@ module Cheetah
     #   stdout, exitcode = Cheetah.run("cmd", stdout: :capture, allowed_exitstatus: 1..5)
     #
 
-    def run(*args)
+    def self.run(*args)
       options = args.last.is_a?(Hash) ? args.pop : {}
       options = BUILTIN_DEFAULT_OPTIONS.merge(@default_options).merge(options)
 
@@ -413,7 +414,7 @@ module Cheetah
 
     # Parts of Cheetah.run
 
-    def with_env(env, &block)
+    def self.with_env(env, &block)
       old_env = ENV.to_hash
       ENV.update(env)
       block.call
@@ -421,7 +422,7 @@ module Cheetah
       ENV.replace(old_env)
     end
 
-    def compute_streamed(options)
+    def self.compute_streamed(options)
       # The assumption for :stdout and :stderr is that anything except :capture
       # and nil is an IO-like object. We avoid detecting it directly to allow
       # passing StringIO, mocks, etc.
@@ -432,7 +433,7 @@ module Cheetah
       }
     end
 
-    def build_streams(options, streamed)
+    def self.build_streams(options, streamed)
       {
         stdin:  streamed[:stdin] ? options[:stdin] : StringIO.new(options[:stdin]),
         stdout: streamed[:stdout] ? options[:stdout] : StringIO.new(""),
@@ -440,7 +441,7 @@ module Cheetah
       }
     end
 
-    def build_commands(args)
+    def self.build_commands(args)
       # There are three valid ways how to call Cheetah.run:
       #
       #   1. Single command, e.g. Cheetah.run("ls", "-la")
@@ -462,7 +463,7 @@ module Cheetah
       commands.map { |c| c.map(&:to_s) }
     end
 
-    def build_recorder(options)
+    def self.build_recorder(options)
       if options[:recorder]
         options[:recorder]
       else
@@ -474,7 +475,7 @@ module Cheetah
     # and close the reading half of *pipe*.
     # @param pipe [Array<IO>] a pair of IOs as returned from IO.pipe
     # @param stream [IO]
-    def into_pipe(stream, pipe)
+    def self.into_pipe(stream, pipe)
       stream.reopen(pipe[WRITE])
       pipe[WRITE].close
       pipe[READ].close
@@ -484,13 +485,13 @@ module Cheetah
     # and close the writing half of *pipe*.
     # @param pipe [Array<IO>] a pair of IOs as returned from IO.pipe
     # @param stream [IO]
-    def from_pipe(stream, pipe)
+    def self.from_pipe(stream, pipe)
       stream.reopen(pipe[READ])
       pipe[READ].close
       pipe[WRITE].close
     end
 
-    def chroot_step(options)
+    def self.chroot_step(options)
       return options if [nil, "/"].include?(options[:chroot])
 
       options = options.dup
@@ -503,7 +504,7 @@ module Cheetah
       options
     end
 
-    def fork_commands_recursive(commands, pipes, options)
+    def self.fork_commands_recursive(commands, pipes, options)
       fork do
         begin
           # support chrooting
@@ -550,7 +551,7 @@ module Cheetah
       end
     end
 
-    def fork_commands(commands, options)
+    def self.fork_commands(commands, options)
       pipes = { stdin: IO.pipe, stdout: IO.pipe, stderr: IO.pipe }
 
       pid = fork_commands_recursive(commands, pipes, options)
@@ -564,7 +565,7 @@ module Cheetah
       [pid, pipes]
     end
 
-    def select_loop(streams, pipes, recorder)
+    def self.select_loop(streams, pipes, recorder)
       # We write the command's input and read its output using a select loop.
       # Why? Because otherwise we could end up with a deadlock.
       #
@@ -625,7 +626,7 @@ module Cheetah
       end
     end
 
-    def check_errors(commands, status, streams, streamed, options)
+    def self.check_errors(commands, status, streams, streamed, options)
       return if status.success?
       return if options[:allowed_exitstatus].include?(status.exitstatus)
 
@@ -648,7 +649,7 @@ module Cheetah
       )
     end
 
-    def build_result(streams, status, options)
+    def self.build_result(streams, status, options)
       res = case [options[:stdout] == :capture, options[:stderr] == :capture]
             when [false, false]
               nil
@@ -673,10 +674,9 @@ module Cheetah
       res
     end
 
-    def format_commands(commands)
+    def self.format_commands(commands)
       '"' + commands.map { |c| Shellwords.join(c) }.join(" | ") + '"'
     end
-  end
 
   self.default_options = {}
 end
