@@ -21,7 +21,7 @@ RSpec.configure do |c|
 
   # Normally not necessary but useful when Mutant is active
   c.around(:each) do |example|
-    Timeout.timeout(10, &example)
+    Timeout.timeout(2, &example)
   end
 end
 
