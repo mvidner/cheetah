@@ -1,3 +1,5 @@
+require "timeout"
+
 if ENV["COVERAGE"] || ENV["TRAVIS"]
   require "simplecov"
   SimpleCov.start
@@ -16,6 +18,11 @@ require File.expand_path(File.dirname(__FILE__) + "/../lib/cheetah")
 
 RSpec.configure do |c|
   c.color = true
+
+  # Normally not necessary but useful when Mutant is active
+  c.around(:each) do |example|
+    Timeout.timeout(10, &example)
+  end
 end
 
 RSpec::Matchers.define :touch do |*files|
