@@ -198,8 +198,10 @@ describe Cheetah do
     describe "running commands" do
       before(:each) do
         allow(Cheetah).to receive(:fork) do |&block|
-          puts "FORK"
-          Kernel.fork(&block)
+          @fork_count ||= 0
+          @fork_count += 1
+          puts "FORK #{@fork_count}"
+          Kernel.fork(&block) unless @fork_count > 10
         end
       end
       it "runs a command without arguments" do
