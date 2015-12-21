@@ -196,6 +196,12 @@ describe Cheetah do
     end
 
     describe "running commands" do
+      before(:each) do
+        allow(Cheetah).to receive(:fork) do |&block|
+          puts "FORK"
+          Kernel.fork(&block)
+        end
+      end
       it "runs a command without arguments" do
         command = create_command("touch #{tmp_dir}/touched")
         expect { Cheetah.run(command) }.to touch("#{tmp_dir}/touched")
